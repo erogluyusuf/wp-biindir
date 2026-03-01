@@ -4,8 +4,6 @@
 
 This is a high-performance WhatsApp bot specifically optimized for **Raspberry Pi 5**. It automatically detects YouTube and Instagram links in chats, processes them through the **Bagdeg API** infrastructure, and delivers playable media directly back to the user.
 
-
-
 ##  Features
 
 * **Multi-Platform Support:** Works seamlessly with YouTube (Shorts/Videos) and Instagram (Reels/Posts).
@@ -14,9 +12,9 @@ This is a high-performance WhatsApp bot specifically optimized for **Raspberry P
 * **Automated Conversion:** Uses `yt-dlp` and `ffmpeg` to ensure every video is 100% compatible with WhatsApp's native player.
 * **Resource Efficient:** Low-idle power consumption with automated disk cleanup after each transmission.
 
-## 🛠️ Technical Stack
+##  Technical Stack
 
-* **Hardware:** Raspberry Pi 5 (8GB)
+* **Hardware:** Raspberry Pi 5 (16GB)
 * **OS:** Ubuntu 24.04 Server (ARM64)
 * **Runtime:** Node.js v20+
 * **Core Engines:** yt-dlp, ffmpeg, Chromium (Headless)
@@ -24,30 +22,32 @@ This is a high-performance WhatsApp bot specifically optimized for **Raspberry P
 
 ##  Getting Started
 
-### 1. Installation
-Clone the repository and install the necessary Node.js packages:
+###  Option 1: Smart Auto-Installation (Recommended)
+You can set up the entire environment, install dependencies, and create a 24/7 background service with just one command:
 ```bash
-git clone [https://github.com/erogluyusuf/wp-biindir.git](https://github.com/erogluyusuf/wp-biindir.git)
+git clone https://github.com/erogluyusuf/wp-biindir.git
 cd wp-biindir
-npm install
-```
-### 2. System Dependencies
-Ensure your Pi 5 has the latest media processing tools:
-
-```bash
-sudo apt update
-sudo apt install ffmpeg chromium-browser
-# Install latest yt-dlp
-sudo wget [https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp](https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp) -O /usr/local/bin/yt-dlp
-sudo chmod a+rx /usr/local/bin/yt-dlp
+sudo chmod +x install.sh
+sudo ./install.sh
 ```
 
-### 3. Running the Bot
-Start the service and scan the generated QR code with your WhatsApp:
+###  Option 2: Manual Installation
+If you prefer to set it up manually:
+1. Clone the repo and run `npm install`.
+2. Install system packages: `sudo apt install ffmpeg chromium-browser`
+3. Install yt-dlp: `sudo wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp && sudo chmod a+rx /usr/local/bin/yt-dlp`
+4. Run: `node index.js`
 
-```bash
-node index.js
-```
+##  Usage
+Once the bot is running and you have scanned the QR code with a WhatsApp account:
+
+1. Simply send any **YouTube** (Video/Shorts) or **Instagram** (Reels/Post) link to the bot's WhatsApp number.
+2. The bot will automatically detect the link, place it in the queue, download it, and reply with the playable `.mp4` video directly in the chat.
+3. Type `!ping` to check if the Pi 5 is online.
+
+##  Disclaimer
+This bot is for personal and educational use. Using unofficial APIs with standard WhatsApp accounts may lead to temporary bans from WhatsApp. It is highly recommended to use a spare phone number for the bot.
+
 ##  Security & Privacy
 This project is pre-configured with a `.gitignore` file. It strictly excludes:
 
