@@ -1,0 +1,10 @@
+# Kütüphaneler
+node_modules/
+
+# WhatsApp Oturum ve Önbellek Dosyaları (Çok Önemli!)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# İnen Videolar (Yanlışlıkla repoya gitmesin)
+*.mp4
+*.m4a
