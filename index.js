@@ -3,9 +3,46 @@ const qrcode = require('qrcode-terminal');
 const { exec } = require('child_process');
 const fs = require('fs');
 const util = require('util');
+const path = require('path');
 
-// exec komutunu modern async/await yapısına uygun hale getiriyoruz
 const execPromise = util.promisify(exec);
+
+// Dosyaların barınacağı klasör yolu (/data)
+const DOWNLOAD_DIR = path.join(__dirname, 'data');
+const LOG_FILE = path.join(DOWNLOAD_DIR, 'logs.json'); // Log dosyasının yolu
+
+if (!fs.existsSync(DOWNLOAD_DIR)) {
+    fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+}
+
+// LOG KAYDETME FONKSİYONU
+function saveLog(phone, url, status, errorDetail = null) {
+    try {
+        let logs = [];
+        // Eğer log dosyası varsa önce içindekileri oku
+        if (fs.existsSync(LOG_FILE)) {
+            const rawData = fs.readFileSync(LOG_FILE, 'utf8');
+            if (rawData) {
+                logs = JSON.parse(rawData);
+            }
+        }
+
+        // Yeni log objesini oluştur
+        const newLog = {
+            tarih: new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }),
+            numara: phone.replace('@c.us', ''), // Sadece numarayı al
+            link: url,
+            durum: status,
+            hata: errorDetail
+        };
+
+        // Listeye ekle ve dosyaya geri yaz (JSON.stringify ile formatlı olarak)
+        logs.push(newLog);
+        fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 4));
+    } catch (err) {
+        console.error('Log yazılırken hata oluştu:', err);
+    }
+}
 
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -15,9 +52,8 @@ const client = new Client({
     }
 });
 
-// KUYRUK SİSTEMİ DEĞİŞKENLERİ
-const downloadQueue = []; // Gelen linklerin bekleyeceği sıra
-let isProcessing = false; // Sistem şu an bir şey indiriyor mu?
+const downloadQueue = []; 
+let isProcessing = false; 
 
 client.on('qr', (qr) => {
     console.log('\nBağlantı bekleniyor... Lütfen aşağıdaki QR kodu okut:\n');
@@ -25,43 +61,64 @@ client.on('qr', (qr) => {
 });
 
 client.on('ready', () => {
-    console.log('\nHarika! Sistem uyandı, YouTube ve Instagram linklerini bekliyor...\n');
+    console.log('\nHarika! Sistem uyandı, YouTube (Music dahil) ve Instagram linklerini bekliyor...\n');
 });
 
 // KUYRUK İŞLEME FONKSİYONU
 async function processQueue() {
-    // Eğer zaten bir indirme işlemi sürüyorsa veya sıra boşsa fonksiyonu durdur
     if (isProcessing || downloadQueue.length === 0) return;
 
-    isProcessing = true; // Meşgul moduna geç
-
-    // Sıradaki ilk elemanı al (kuyruktan çıkar)
+    isProcessing = true;
     const task = downloadQueue.shift();
-    const { message, url, fileName, platform } = task;
+    const { message, url, fileName, platform, isAudio } = task;
+    
+    const filePath = path.join(DOWNLOAD_DIR, fileName);
 
     try {
-        await message.reply(`Sıra size geldi! ${platform} videosu indiriliyor... 🚀`);
+        const typeText = isAudio ? 'ses (MP3)' : 'videosu';
+        await message.reply(`Sıra size geldi! ${platform} ${typeText} indiriliyor... 🚀`);
 
-        const command = `yt-dlp -f "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" -o "${fileName}" "${url}"`;
+        let command = '';
+        if (isAudio) {
+            // Sadece ses, kesinlikle MP3
+            command = `yt-dlp -f "bestaudio" -x --audio-format mp3 -o "${filePath}" "${url}"`;
+        } else {
+            // WhatsApp'ın en sevdiği format: H264 codec ve MP4/M4A uyumu
+            command = `yt-dlp -S "ext:mp4:m4a,vcodec:h264" --merge-output-format mp4 -o "${filePath}" "${url}"`;
+        }
         
-        // exec komutunun bitmesini bekliyoruz
-        await execPromise(command);
+        await execPromise(command, { maxBuffer: 1024 * 1024 * 50 });
 
-        if (fs.existsSync(fileName)) {
-            await message.reply('Video hazır, gönderiliyor...');
-            const media = MessageMedia.fromFilePath(fileName);
+        if (fs.existsSync(filePath)) {
+            await message.reply(`${isAudio ? 'Ses dosyası' : 'Video'} hazır, gönderiliyor...`);
+            
+            const media = MessageMedia.fromFilePath(filePath);
             await client.sendMessage(message.from, media);
             
-            fs.unlinkSync(fileName);
+            fs.unlinkSync(filePath);
             console.log(`${fileName} başarıyla gönderildi ve silindi.`);
+            
+            // BAŞARILI LOGU YAZDIR
+            saveLog(message.from, url, 'Başarılı Gönderildi');
+        } else {
+            throw new Error(`Dosya indirilemedi veya ffmpeg birleştiremedi!`);
         }
     } catch (error) {
-        console.error(`İşlem hatası: ${error.message}`);
-        await message.reply(`Maalesef ${platform} videosu indirilirken/gönderilirken bir hata oluştu.`);
-        if (fs.existsSync(fileName)) fs.unlinkSync(fileName); // Hata olsa bile diski temizle
+        // GERÇEK HATAYI YAKALAMA
+        const realError = error.stderr ? error.stderr.toString() : error.message;
+        console.error(`\n--- İŞLEM HATASI ---\n${realError}\n--------------------\n`);
+        
+        // Hatayı temizle ve kullanıcıya okunaklı şekilde gönder
+        const shortError = realError.substring(0, 200);
+        await message.reply(`❌ İşlem başarısız oldu!\n*Sebep:*\n_${shortError}_`);
+        
+        // HATA LOGU YAZDIR
+        saveLog(message.from, url, 'Hata Oluştu', shortError.trim());
+
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath); 
     } finally {
-        isProcessing = false; // İşlem bitti, meşgul modundan çık
-        processQueue(); // Sıradaki diğer işlem için fonksiyonu tekrar çağır
+        isProcessing = false;
+        processQueue();
     }
 }
 
@@ -71,11 +128,14 @@ client.on('message_create', async (message) => {
         return;
     }
 
-    const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+    const textToParse = message.body.trim();
+    let isAudio = textToParse.toLowerCase().startsWith('mp3 ');
+
+    const ytRegex = /(?:https?:\/\/)?(?:www\.|music\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
     const igRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:p|reel|reels|tv)\/([a-zA-Z0-9_-]+)/;
 
-    const ytMatch = message.body.match(ytRegex);
-    const igMatch = message.body.match(igRegex);
+    const ytMatch = textToParse.match(ytRegex);
+    const igMatch = textToParse.match(igRegex);
 
     let url = '';
     let fileName = '';
@@ -83,25 +143,27 @@ client.on('message_create', async (message) => {
 
     if (ytMatch) {
         url = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
-        fileName = `yt_${ytMatch[1]}.mp4`;
-        platform = 'YouTube';
+        
+        if (textToParse.includes('music.youtube.com')) {
+            isAudio = true;
+            platform = 'YouTube Music';
+        } else {
+            platform = 'YouTube';
+        }
+        fileName = `yt_${ytMatch[1]}.${isAudio ? 'mp3' : 'mp4'}`;
     } else if (igMatch) {
         url = `https://www.instagram.com/reel/${igMatch[1]}/`;
-        fileName = `ig_${igMatch[1]}.mp4`;
         platform = 'Instagram';
+        fileName = `ig_${igMatch[1]}.${isAudio ? 'mp3' : 'mp4'}`;
     }
 
-    // Eğer geçerli bir link bulunduysa hemen sıraya ekle
     if (url !== '') {
-        // İşlemi kuyruğa ekle
-        downloadQueue.push({ message, url, fileName, platform });
+        downloadQueue.push({ message, url, fileName, platform, isAudio });
 
-        // Kullanıcıya kaçıncı sırada olduğunu bildir
         if (isProcessing) {
             await message.reply(`Linkiniz sıraya alındı! Önünüzde bekleyen işlem sayısı: ${downloadQueue.length}`);
         }
 
-        // Kuyruğu çalışmayı dene (Eğer boşta ise hemen başlar, doluysa sırasını bekler)
         processQueue();
     }
 });
