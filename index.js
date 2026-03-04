@@ -135,7 +135,7 @@ client.on('message_create', async (message) => {
                 // Mesajın iletilmesi için çok kısa bir süre bekle, sonra servisi yeniden başlat
                 setTimeout(() => {
                     execPromise('systemctl restart wp-biindir.service').catch(err => {
-                        console.error('Restart başarısız:', err);
+                        console.error('Restart başarısız: ', err);
                     });
                 }, 1000);
                 
