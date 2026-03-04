@@ -127,7 +127,24 @@ client.on('message_create', async (message) => {
         await message.reply('pong! Pi 5 şu an hatta.');
         return;
     }
-
+    if(message.body === '!restart') {
+            // Sadece senin gönderdiğin mesajlarda çalışsın (Güvenlik için)
+            if (message.fromMe) {
+                await message.reply('🔄 Servis yeniden başlatılıyor... Lütfen 10-15 saniye bekleyin.');
+                
+                // Mesajın iletilmesi için çok kısa bir süre bekle, sonra servisi yeniden başlat
+                setTimeout(() => {
+                    execPromise('systemctl restart wp-biindir.service').catch(err => {
+                        console.error('Restart başarısız:', err);
+                    });
+                }, 1000);
+                
+            } else {
+                // Başkası denerse verilecek cevap (İstersen bu else kısmını silebilirsin)
+                await message.reply('⛔ Bu komutu kullanma yetkiniz yok!');
+            }
+            return;
+        }
     const textToParse = message.body.trim();
     let isAudio = textToParse.toLowerCase().startsWith('mp3 ');
 
