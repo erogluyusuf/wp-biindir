@@ -2,7 +2,7 @@
 
 <img src="https://badges-jet.vercel.app/api/card?username=erogluyusuf&repo=wp-biindir&theme=dark&bg=0d1117&titleColor=58a6ff&textColor=8b949e&animate=true&qr=true&customBadges=OS:Ubuntu:E95420:ubuntu,Dev:Node.js:339933:nodedotjs,Core:Python:3776AB:python,Tool:yt-dlp:FF0000:youtube,Hardware:Pi5:C51A4A:raspberrypi" width="100%">
 
-This is a high-performance WhatsApp bot specifically optimized for **Raspberry Pi 5**. It automatically detects YouTube and Instagram links in chats, processes them through the **Bagdeg API** infrastructure, and delivers playable media directly back to the user.
+This is a high-performance WhatsApp bot specifically optimized for **Raspberry Pi 5**. It automatically detects YouTube and Instagram links in chats, processes them through the **Bagdeg API** infrastructure, and delivers playable media directly back to the user. 
 
 ##  Features
 
